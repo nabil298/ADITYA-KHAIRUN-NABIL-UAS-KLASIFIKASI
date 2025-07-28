@@ -1,69 +1,54 @@
-# Prediksi Tingkat Stres Berdasarkan Data Pengguna Baru
-
+import streamlit as st
 import pandas as pd
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
 
-# 1. Memuat Data
-# Gantilah path dengan path file CSV yang sesuai jika dijalankan di lokal
-url = '/content/drive/MyDrive/dataset/Student Mental Health Analysis During Online Learning.csv'
-df = pd.read_csv(url)
+st.title("Prediksi Tingkat Stres Mahasiswa")
 
-# 2. Pra-pemrosesan Data
-X = df[['Screen Time (hrs/day)', 'Sleep Duration (hrs)', 'Physical Activity (hrs/week)']]
-y = df['Stress Level']
+# Upload CSV
+uploaded_file = st.file_uploader("Upload file CSV", type=["csv"])
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
 
-# Encode label target
-le = LabelEncoder()
-y = le.fit_transform(y)
+    # Pra-pemrosesan
+    X = df[['Screen Time (hrs/day)', 'Sleep Duration (hrs)', 'Physical Activity (hrs/week)']]
+    y = df['Stress Level']
+    le = LabelEncoder()
+    y = le.fit_transform(y)
 
-# 3. Split data
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# 4. Grid Search untuk mencari n_neighbors terbaik
-param_grid = {'n_neighbors': range(1, 31)}
-grid_search = GridSearchCV(KNeighborsClassifier(), param_grid, cv=5)
-grid_search.fit(X_train, y_train)
+    # Grid Search
+    param_grid = {'n_neighbors': range(1, 31)}
+    grid_search = GridSearchCV(KNeighborsClassifier(), param_grid, cv=5)
+    grid_search.fit(X_train, y_train)
+    best_n = grid_search.best_params_['n_neighbors']
 
-best_n = grid_search.best_params_['n_neighbors']
-print(f"Nilai n_neighbors terbaik: {best_n}")
+    st.success(f"Nilai n_neighbors terbaik: {best_n}")
 
-# 5. Pelatihan model terbaik
-knn_best = KNeighborsClassifier(n_neighbors=best_n)
-knn_best.fit(X_train, y_train)
+    # Pelatihan model
+    knn_best = KNeighborsClassifier(n_neighbors=best_n)
+    knn_best.fit(X_train, y_train)
 
-# 6. Evaluasi
-y_pred_best = knn_best.predict(X_test)
-new_accuracy = accuracy_score(y_test, y_pred_best)
-print(f"Akurasi Model Baru: {new_accuracy}")
+    # Evaluasi
+    y_pred_best = knn_best.predict(X_test)
+    acc = accuracy_score(y_test, y_pred_best)
+    st.info(f"Akurasi Model: {acc:.2f}")
 
-if new_accuracy >= 0.6:
-    print("Akurasi model telah mencapai target minimal 60%.")
-else:
-    print("Akurasi model masih di bawah 60%. Pertimbangkan untuk mencoba algoritma lain atau rekayasa fitur lebih lanjut.")
+    # Form input pengguna
+    st.header("Prediksi Tingkat Stres Berdasarkan Data Baru")
+    screen_time = st.number_input("Screen Time (jam/hari)", min_value=0.0, value=4.0)
+    sleep_duration = st.number_input("Durasi Tidur (jam)", min_value=0.0, value=6.0)
+    physical_activity = st.number_input("Aktivitas Fisik (jam/minggu)", min_value=0.0, value=3.0)
 
-# 7. Prediksi berdasarkan input pengguna
-print("\nMasukkan data baru untuk memprediksi tingkat stres:")
-
-try:
-    new_screen_time = float(input("Masukkan screen time (jam/hari): "))
-    new_sleep_duration = float(input("Masukkan durasi tidur (jam): "))
-    new_physical_activity = float(input("Masukkan aktivitas fisik (jam/minggu): "))
-
-    # Buat DataFrame dari input user
-    new_data_df = pd.DataFrame([[new_screen_time, new_sleep_duration, new_physical_activity]],
+    if st.button("Prediksi"):
+        new_data = pd.DataFrame([[screen_time, sleep_duration, physical_activity]],
                                 columns=['Screen Time (hrs/day)', 'Sleep Duration (hrs)', 'Physical Activity (hrs/week)'])
-
-    # Prediksi
-    predicted = knn_best.predict(new_data_df)
-    predicted_label = le.inverse_transform(predicted)[0]
-
-    print("\nUntuk data tersebut:")
-    print(f"Prediksi Tingkat Stres: {predicted_label}")
-
-except ValueError:
-    print("Input tidak valid. Harap masukkan angka.")
-except Exception as e:
-    print(f"Terjadi kesalahan: {e}")
+        prediction = knn_best.predict(new_data)
+        pred_label = le.inverse_transform(prediction)[0]
+        st.success(f"Prediksi Tingkat Stres: {pred_label}")
+else:
+    st.warning("Silakan unggah file dataset CSV terlebih dahulu.")
